@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext .jsx,.js"
+    "lint": "eslint src --ext .jsx,.js",
+    "netlify:build": "npm run build",
+    "netlify:dev": "npm run dev"
   },
   "dependencies": {
     "react": "^18.2.0",
