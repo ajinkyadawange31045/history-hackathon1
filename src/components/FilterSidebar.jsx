@@ -26,14 +26,14 @@ export const FilterSidebar = ({
     subjects: false,
     institutions: false,
   });
-  
+
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section],
     }));
   };
-  
+
   const CheckboxGroup = ({ section, label, options, selected }) => (
     <div className={archiveClasses.filterSection}>
       {/* Section Header */}
@@ -50,10 +50,10 @@ export const FilterSidebar = ({
           fill="currentColor"
           className={`transition-transform ${expandedSections[section] ? 'rotate-180' : ''}`}
         >
-          <path d="M3.5 5.5l4.5 4.5 4.5-4.5" stroke="currentColor" fill="none" strokeWidth="2"/>
+          <path d="M3.5 5.5l4.5 4.5 4.5-4.5" stroke="currentColor" fill="none" strokeWidth="2" />
         </svg>
       </button>
-      
+
       {/* Checkboxes */}
       {expandedSections[section] && (
         <div className="space-y-2 mb-4">
@@ -91,7 +91,7 @@ export const FilterSidebar = ({
       )}
     </div>
   );
-  
+
   const hasFilters = Object.values(filters).some(value => {
     if (Array.isArray(value)) return value.length > 0;
     if (typeof value === 'object') {
@@ -99,7 +99,7 @@ export const FilterSidebar = ({
     }
     return value;
   });
-  
+
   return (
     <aside
       className={className}
@@ -118,7 +118,7 @@ export const FilterSidebar = ({
       >
         Refine Search
       </h2>
-      
+
       <div className="px-6 space-y-4">
         {/* Type Filter */}
         <CheckboxGroup
@@ -127,7 +127,7 @@ export const FilterSidebar = ({
           options={filterOptions.types}
           selected={filters.types}
         />
-        
+
         {/* Region Filter */}
         <CheckboxGroup
           section="regions"
@@ -135,7 +135,7 @@ export const FilterSidebar = ({
           options={filterOptions.regions}
           selected={filters.regions}
         />
-        
+
         {/* Date Range Filter */}
         {onSetDateRange && (
           <div className={archiveClasses.filterSection}>
@@ -153,10 +153,10 @@ export const FilterSidebar = ({
                 fill="currentColor"
                 className={`transition-transform ${expandedSections.dateRange ? 'rotate-180' : ''}`}
               >
-                <path d="M3.5 5.5l4.5 4.5 4.5-4.5" stroke="currentColor" fill="none" strokeWidth="2"/>
+                <path d="M3.5 5.5l4.5 4.5 4.5-4.5" stroke="currentColor" fill="none" strokeWidth="2" />
               </svg>
             </button>
-            
+
             {/* Date Range Inputs */}
             {expandedSections.dateRange && (
               <div className="space-y-3 mb-4">
@@ -200,7 +200,7 @@ export const FilterSidebar = ({
             )}
           </div>
         )}
-        
+
         {/* Language Filter */}
         <CheckboxGroup
           section="languages"
@@ -208,7 +208,7 @@ export const FilterSidebar = ({
           options={filterOptions.languages}
           selected={filters.languages}
         />
-        
+
         {/* Subjects Filter */}
         <CheckboxGroup
           section="subjects"
@@ -216,7 +216,7 @@ export const FilterSidebar = ({
           options={filterOptions.subjects}
           selected={filters.subjects}
         />
-        
+
         {/* Institution Filter */}
         <CheckboxGroup
           section="institutions"
@@ -224,7 +224,7 @@ export const FilterSidebar = ({
           options={filterOptions.institutions}
           selected={filters.institutions}
         />
-        
+
         {/* Clear Filters Button */}
         {hasFilters && (
           <button
@@ -263,7 +263,7 @@ export const FilterDrawer = ({
   onClearFilters,
 }) => {
   if (!isOpen) return null;
-  
+
   return (
     <>
       {/* Backdrop */}
@@ -271,7 +271,7 @@ export const FilterDrawer = ({
         className="fixed inset-0 bg-black/40 z-30 md:hidden"
         onClick={onClose}
       />
-      
+
       {/* Drawer */}
       <div
         className={`
@@ -300,7 +300,7 @@ export const FilterDrawer = ({
             </svg>
           </button>
         </div>
-        
+
         {/* Filters Content */}
         <FilterSidebar
           documents={documents}

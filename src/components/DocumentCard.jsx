@@ -351,10 +351,100 @@ export const DocumentCardSkeleton = () => {
 };
 
 /**
- * RESULTS GRID
- * Display multiple document cards in responsive grid (3 per row)
+ * DOCUMENT LIST ROW
+ * A more compact horizontal layout for browsing results
  */
-export const ResultsGrid = ({ documents, totalResults, isLoading = false, searchQuery }) => {
+export const DocumentListRow = ({ document, searchQuery }) => {
+  const navigate = useNavigate();
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const highlightIfSearched = (text) => {
+    if (!searchQuery || !text) return text;
+    return highlightText(text, searchQuery, {
+      className: 'search-highlight',
+    });
+  };
+  
+  const handleRowClick = (e) => {
+    e.preventDefault();
+    navigate(`/document/${document.id}`);
+  };
+  
+  return (
+    <div
+      onClick={handleRowClick}
+      className="group cursor-pointer flex flex-col md:flex-row gap-4 p-4 mb-3 rounded-lg transition-all duration-300 hover:shadow-md border"
+      style={{
+        backgroundColor: archiveColors.cream,
+        borderColor: `${archiveColors.sepia}40`,
+        borderLeft: `4px solid ${archiveColors.rust}`,
+      }}
+    >
+      {/* Thumbnail */}
+      <div className="flex-shrink-0 w-full md:w-32 h-32 md:h-24 rounded overflow-hidden">
+        <img
+          src={getDocumentImage(document.id)}
+          alt={document.title}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.target.src = getFallbackImage();
+          }}
+        />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <time className="text-[10px] font-sans uppercase tracking-wider opacity-60" style={{ color: archiveColors.darkBrown }}>
+            {formatDate(document.date)} • {document.type}
+          </time>
+          {document.place && (
+            <span className="text-[10px] font-sans opacity-60" style={{ color: archiveColors.darkBrown }}>
+              {document.place}
+            </span>
+          )}
+        </div>
+        
+        <h3
+          className="font-serif text-lg font-bold mb-1 group-hover:text-rust transition-colors truncate"
+          style={{ color: archiveColors.darkBrown }}
+          dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.title) }}
+        />
+        
+        <p
+          className="font-sans text-xs line-clamp-2 md:line-clamp-1 opacity-75 leading-relaxed"
+          style={{ color: archiveColors.darkBrown }}
+          dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.description) }}
+        />
+        
+        <div className="mt-2 flex items-center gap-4">
+          {document.author && (
+            <span className="text-[10px] opacity-60 font-medium" style={{ color: archiveColors.darkBrown }}>
+              Author: {document.author}
+            </span>
+          )}
+          <span className="text-[10px] font-bold uppercase tracking-tighter" style={{ color: archiveColors.rust }}>
+            View Record →
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * RESULTS GRID
+ * Display multiple document cards in responsive grid (3 per row) or list view
+ */
+export const ResultsGrid = ({ documents, totalResults, isLoading = false, searchQuery, viewMode = 'grid' }) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -407,6 +497,16 @@ export const ResultsGrid = ({ documents, totalResults, isLoading = false, search
     );
   }
   
+  if (viewMode === 'list') {
+    return (
+      <div className="flex flex-col">
+        {documents.map(document => (
+          <DocumentListRow key={document.id} document={document} searchQuery={searchQuery} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {documents.map(document => (
@@ -415,5 +515,6 @@ export const ResultsGrid = ({ documents, totalResults, isLoading = false, search
     </div>
   );
 };
+
 
 export default DocumentCard;

@@ -6,7 +6,7 @@ import { archiveColors, archiveClasses } from '../styles/theme';
  * Large search bar with aged paper aesthetic
  * Main entry point for archive exploration
  */
-export const HeroSection = ({ onSearch, onSubmit }) => {
+export const HeroSection = ({ onSearch, onSubmit, searchField, onSearchFieldChange }) => {
   const [localQuery, setLocalQuery] = useState('');
   
   const handleInputChange = (e) => {
@@ -49,14 +49,14 @@ export const HeroSection = ({ onSearch, onSubmit }) => {
         
         {/* Subtitle */}
         <p
-          className="text-lg mb-12"
+          className="text-lg mb-8"
           style={{ color: archiveColors.darkBrown, opacity: 0.75 }}
         >
           Discover historical documents, manuscripts, and artifacts from across the globe
         </p>
         
         {/* Search Bar */}
-        <form onSubmit={handleSubmit} className="relative">
+        <form onSubmit={handleSubmit} className="relative mb-6">
           <input
             type="text"
             placeholder="Search by title, place, subject, or keyword..."
@@ -105,15 +105,41 @@ export const HeroSection = ({ onSearch, onSubmit }) => {
             </svg>
           </button>
         </form>
+
+        {/* Search Field Selection - MOVED BELOW BAR */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
+          <span className="text-xs uppercase tracking-widest font-bold opacity-60" style={{ color: archiveColors.darkBrown }}>Search in:</span>
+          <div className="flex bg-white/50 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-white/20" style={{ borderColor: `${archiveColors.sepia}40` }}>
+            {[
+              { id: 'all', label: 'All Fields' },
+              { id: 'title', label: 'Title Only' },
+              { id: 'description', label: 'Description' }
+            ].map((field) => (
+              <button
+                key={field.id}
+                onClick={() => onSearchFieldChange(field.id)}
+                className={`px-4 py-1.5 text-xs rounded-md transition-all duration-300 ${searchField === field.id ? 'shadow-md scale-105' : 'opacity-60 hover:opacity-100 hover:bg-white/30'}`}
+                style={{
+                  backgroundColor: searchField === field.id ? archiveColors.rust : 'transparent',
+                  color: searchField === field.id ? 'white' : archiveColors.darkBrown,
+                  fontWeight: searchField === field.id ? '600' : '400',
+                }}
+              >
+                {field.label}
+              </button>
+            ))}
+          </div>
+        </div>
         
         {/* Quick hints */}
-        <p className="text-xs mt-6" style={{ color: archiveColors.darkBrown, opacity: 0.6 }}>
+        <p className="text-xs pt-4" style={{ color: archiveColors.darkBrown, opacity: 0.6 }}>
           Tip: Search by place name, document type, time period, or subject matter
         </p>
       </div>
     </div>
   );
 };
+
 
 /**
  * STICKY SEARCH BAR

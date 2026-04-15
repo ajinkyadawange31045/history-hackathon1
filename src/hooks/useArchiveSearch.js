@@ -9,7 +9,9 @@ import { applyFilters, getDefaultFilters } from '../utils/filterLogic';
 export const useArchiveSearch = (documents, metadata) => {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(getDefaultFilters());
-  const [sortBy, setSortBy] = useState('relevance'); // 'relevance' or 'date'
+  const [sortBy, setSortBy] = useState('relevance'); // 'relevance', 'date-newest', 'date-oldest', 'title'
+  const [searchField, setSearchField] = useState('all'); // 'all', 'title', 'description'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid', 'list'
   const [debouncedQuery, setDebouncedQuery] = useState('');
   
   // Debounce search query (300ms delay for performance)
@@ -27,22 +29,26 @@ export const useArchiveSearch = (documents, metadata) => {
     
     // Step 1: Search (only if there's a query)
     let searchableDocuments = debouncedQuery
-      ? searchDocuments(documents, debouncedQuery)
+      ? searchDocuments(documents, debouncedQuery, { searchField })
       : documents;
     
-    // Step 2: Apply filters (only to the searched results when search is active)
-    // When search is active, filters apply to searched results only
-    // When no search, filters apply to all documents
+    // Step 2: Apply filters
     const filtered = applyFilters(searchableDocuments, filters);
     
     // Step 3: Sort
-    if (sortBy === 'date') {
-      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sorted = [...filtered];
+    if (sortBy === 'date-newest') {
+      sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+    } else if (sortBy === 'date-oldest') {
+      sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+    } else if (sortBy === 'title') {
+      sorted.sort((a, b) => a.title.localeCompare(b.title));
     }
-    // 'relevance' sort already applied by searchDocuments
+    // 'relevance' sort already applied by searchDocuments (if query exists)
+    // if no query and relevance is selected, default to original order or newest
     
-    return filtered;
-  }, [debouncedQuery, filters, sortBy, documents]);
+    return sorted;
+  }, [debouncedQuery, filters, sortBy, searchField, documents]);
   
   // Toggle filter option
   const toggleFilter = useCallback((category, value) => {
@@ -84,6 +90,7 @@ export const useArchiveSearch = (documents, metadata) => {
     setQuery('');
     setFilters(getDefaultFilters());
     setSortBy('relevance');
+    setSearchField('all');
   }, []);
   
   return {
@@ -97,10 +104,15 @@ export const useArchiveSearch = (documents, metadata) => {
     reset,
     sortBy,
     setSortBy,
+    searchField,
+    setSearchField,
+    viewMode,
+    setViewMode,
     results,
     totalResults: results.length,
   };
 };
+
 
 /**
  * Hook for managing UI state (mobile drawer, scroll position)
