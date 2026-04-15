@@ -179,7 +179,7 @@ export const DocumentCard = ({ document, searchQuery }) => {
         </div>
         
         {/* CTA FOOTER - elegant separator and link */}
-        <div className="mt-auto pt-3" style={{ borderTop: `1px solid ${archiveColors.sepia}25` }}>
+        <div className="pt-3" style={{ borderTop: `1px solid ${archiveColors.sepia}25` }}>
           <button
             onClick={handleCardClick}
             className="font-sans text-xs font-semibold uppercase tracking-wider transition-all duration-300 hover:gap-1 flex items-center gap-0.5 group/btn"
