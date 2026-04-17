@@ -1,246 +1,205 @@
 /**
- * INTELLIGENT ARCHIVAL SEARCH ALGORITHM
+ * REFINED MULTI-WORD SEARCH ALGORITHM
  * 
- * enhanced relevance scoring system:
- * 1. Independent word search (multi-term support)
- * 2. Stop-word exclusion
- * 3. Field-weighted matching
- * 4. Field-specific search support
+ * This algorithm:
+ * 1. Splits the search query into individual words (piercing).
+ * 2. Processes each word independently.
+ * 3. Searches across ALL fields (title, description, author, place, etc.).
+ * 4. Calculates a relevance score based on how many words matched.
+ * 5. Supports both "Strict" (All words must match) and "Smart" (Any word matches, sorted by relevance) searches.
  */
 
 /**
- * Common stop words to exclude from independent word search
- */
-const STOP_WORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'else', 'when', 
-  'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 
-  'through', 'during', 'before', 'after', 'above', 'below', 'to', 
-  'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 
-  'again', 'further', 'then', 'once', 'here', 'there', 'all', 'any', 
-  'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
-  'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
-  's', 't', 'can', 'will', 'just', 'don', 'should', 'now'
-]);
-
-/**
- * Normalize search query for comparison
+ * Normalize text for comparison: lowercase, trim, remove extra spaces
  */
 export const normalizeQuery = (query) => {
-  return query.toLowerCase().trim();
+  if (!query) return '';
+  return query.toLowerCase().trim().replace(/\s+/g, ' ');
 };
 
 /**
- * Simple fuzzy matching algorithm
- * Checks if query characters appear in order in the field
+ * Get all searchable text from a document
  */
-const fuzzyMatch = (field, query) => {
-  if (query.length < 3) return false; // Fuzzy match only for longer terms
-  let queryIdx = 0;
-  for (let i = 0; i < field.length && queryIdx < query.length; i++) {
-    if (field[i] === query[queryIdx]) {
-      queryIdx++;
-    }
-  }
-  return queryIdx === query.length;
+const getDocumentSearchText = (doc) => {
+  const fields = [
+    doc.title,
+    doc.description,
+    doc.author,
+    doc.place,
+    doc.region,
+    doc.type,
+    doc.format,
+    doc.collection,
+    doc.language,
+    doc.holdingInstitution,
+    ...(doc.subjects || []),
+    ...(doc.keywords || []),
+    ...(doc.tags || []),
+  ];
+  
+  return fields
+    .filter(val => val !== null && val !== undefined)
+    .map(val => String(val).toLowerCase())
+    .join(' ');
 };
 
 /**
- * Calculate relevance score for a single field against a single term
- */
-const scoreTermAgainstField = (fieldValue, term, fieldWeight = 1) => {
-  if (!fieldValue || !term) return 0;
-  
-  const normalized = normalizeQuery(String(fieldValue));
-  const q = normalizeQuery(term);
-  
-  let score = 0;
-  
-  // Exact match (highest)
-  if (normalized === q) {
-    score = 100;
-  }
-  // Exact word match (high)
-  else if (normalized.split(/\s+/).includes(q)) {
-    score = 80;
-  }
-  // Starts with query (medium-high)
-  else if (normalized.startsWith(q)) {
-    score = 60;
-  }
-  // Contains query (medium)
-  else if (normalized.includes(q)) {
-    score = 40;
-  }
-  // Partial fuzzy match (low)
-  else if (fuzzyMatch(normalized, q)) {
-    score = 15;
-  }
-  
-  return score * fieldWeight;
-};
-
-/**
- * Calculate array field matches
- */
-const scoreArrayField = (arrayField, term, fieldWeight = 1) => {
-  if (!Array.isArray(arrayField) || arrayField.length === 0) return 0;
-  
-  const scores = arrayField.map(item => scoreTermAgainstField(item, term, fieldWeight));
-  return Math.max(...scores); // Return highest score
-};
-
-/**
- * Main search algorithm - scores a single document
- * Now supports multi-word search and field-specific filtering
- */
-export const scoreDocument = (document, query, options = {}) => {
-  const { searchField = 'all' } = options;
-  if (!query || !query.trim()) return 0;
-  
-  const q = normalizeQuery(query);
-  const terms = q.split(/\s+/).filter(term => term.length > 0);
-  const importantTerms = terms.filter(term => !STOP_WORDS.has(term) || terms.length === 1);
-  
-  // Weights for different fields
-  const weights = {
-    title: 5,
-    subjects: 3,
-    keywords: 2.5,
-    tags: 2,
-    description: 1.5,
-    author: 1,
-    place: 1,
-  };
-
-  let totalScore = 0;
-  let matchesCount = 0;
-
-  // Function to check if we should score a field based on searchField option
-  const shouldScore = (fieldName) => {
-    if (searchField === 'all') return true;
-    if (searchField === 'title' && fieldName === 'title') return true;
-    if (searchField === 'description' && fieldName === 'description') return true;
-    return false;
-  };
-
-  // Score each important term
-  importantTerms.forEach(term => {
-    let termScore = 0;
-    
-    if (shouldScore('title')) {
-      termScore += scoreTermAgainstField(document.title, term, weights.title);
-    }
-    
-    if (shouldScore('description')) {
-      termScore += scoreTermAgainstField(document.description, term, weights.description);
-    }
-    
-    if (searchField === 'all') {
-      termScore += scoreTermAgainstField(document.author, term, weights.author);
-      termScore += scoreTermAgainstField(document.place, term, weights.place);
-      termScore += scoreArrayField(document.subjects || [], term, weights.subjects);
-      termScore += scoreArrayField(document.keywords || [], term, weights.keywords);
-      termScore += scoreArrayField(document.tags || [], term, weights.tags);
-    }
-
-    if (termScore > 0) {
-      totalScore += termScore;
-      matchesCount++;
-    }
-  });
-
-  // Boost if ALL important terms match
-  if (matchesCount === importantTerms.length && importantTerms.length > 1) {
-    totalScore *= 1.5;
-  }
-
-  // Exact whole query boost (if user searched for "India Gulf" and it appears exactly)
-  if (importantTerms.length > 1) {
-    const fullQueryScore = scoreTermAgainstField(document.title, q, weights.title * 2) + 
-                          scoreTermAgainstField(document.description, q, weights.description * 2);
-    totalScore += fullQueryScore;
-  }
-
-  return Math.round(totalScore);
-};
-
-/**
- * Search across entire document collection
- * Returns sorted results with relevance scores
+ * Main search function
  */
 export const searchDocuments = (documents, query, options = {}) => {
+  const { 
+    strict = false, // If true, ALL words must match
+    searchField = 'all' 
+  } = options;
+
   if (!query || !query.trim()) {
     return documents;
   }
-  
-  // Score all documents
-  const scoredResults = documents.map(doc => ({
-    ...doc,
-    relevanceScore: scoreDocument(doc, query, options),
-  }));
-  
-  // Filter to only documents with matches
-  const filtered = scoredResults.filter(doc => doc.relevanceScore > 0);
-  
-  // Sort by relevance (highest first)
-  return filtered.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+  // Split query into words
+  const words = normalizeQuery(query).split(' ').filter(w => w.length > 0);
+  if (words.length === 0) return documents;
+
+  // Process each document
+  const scoredDocuments = documents.map(doc => {
+    let searchText = '';
+    
+    // Determine what text to search
+    if (searchField === 'all') {
+      searchText = getDocumentSearchText(doc);
+    } else {
+      // Search specific field if provided
+      const val = doc[searchField];
+      if (Array.isArray(val)) {
+        searchText = val.join(' ').toLowerCase();
+      } else {
+        searchText = String(val || '').toLowerCase();
+      }
+    }
+
+    // Count matches
+    let matchCount = 0;
+    const matches = words.map(word => {
+      const isMatch = searchText.includes(word);
+      if (isMatch) matchCount++;
+      return isMatch;
+    });
+
+    // For relevance sorting
+    return {
+      ...doc,
+      _searchScore: matchCount,
+      _allWordsMatched: matchCount === words.length
+    };
+  });
+
+  // Filter based on strictness
+  let results = scoredDocuments.filter(doc => {
+    if (strict) {
+      return doc._allWordsMatched;
+    }
+    return doc._searchScore > 0;
+  });
+
+  // Sort by relevance (match count)
+  results.sort((a, b) => {
+    // Primary sort: match count
+    if (b._searchScore !== a._searchScore) {
+      return b._searchScore - a._searchScore;
+    }
+    
+    // Secondary sort: prefer title match
+    const aTitleMatch = a.title.toLowerCase().includes(normalizeQuery(query));
+    const bTitleMatch = b.title.toLowerCase().includes(normalizeQuery(query));
+    if (aTitleMatch !== bTitleMatch) return bTitleMatch ? 1 : -1;
+
+    return 0; // Maintain original order otherwise
+  });
+
+  // Clean up internal properties
+  return results.map(doc => {
+    const { _searchScore, _allWordsMatched, ...cleanDoc } = doc;
+    return cleanDoc;
+  });
 };
 
 /**
- * Highlight matched text in results
+ * Highlight all matched words in text
+ * Uses a two-pass replacement to avoid double-highlighting
  */
 export const highlightMatches = (text, query) => {
   if (!text || !query) return text;
-  
-  const q = normalizeQuery(query);
-  const terms = q.split(/\s+/).filter(term => term.length > 0 && (!STOP_WORDS.has(term) || q.split(/\s+/).length === 1));
-  
-  if (terms.length === 0) return text;
-  
-  let highlightedText = text;
-  // Sort terms by length descending to avoid partial matches within highlights
-  const sortedTerms = [...terms].sort((a, b) => b.length - a.length);
-  
-  // Use a temporary placeholder to avoid double highlighting
-  sortedTerms.forEach((term, index) => {
-    const regex = new RegExp(`(${term})`, 'gi');
-    highlightedText = highlightedText.replace(regex, `__MARK${index}__$1__ENDMARK__`);
+
+  const words = normalizeQuery(query)
+    .split(' ')
+    .filter(word => word.length > 0)
+    .sort((a, b) => b.length - a.length); // Sort longest first
+
+  if (words.length === 0) return text;
+
+  let highlighted = text;
+  const markers = [];
+
+  // Pass 1: Replace matches with unique markers
+  words.forEach((word, wordIndex) => {
+    try {
+      // Escape word for regex
+      const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedWord})`, 'gi');
+      
+      highlighted = highlighted.replace(regex, (match) => {
+        const marker = `__MATCH_${wordIndex}_${markers.length}__`;
+        markers.push({ marker, original: match });
+        return marker;
+      });
+    } catch (e) {
+      // Skip invalid regex
+    }
   });
 
-  highlightedText = highlightedText.replace(/__MARK\d+__/g, '<mark class="bg-yellow-200">');
-  highlightedText = highlightedText.replace(/__ENDMARK__/g, '</mark>');
-  
-  return highlightedText;
+  // Pass 2: Replace markers with HTML
+  markers.forEach(({ marker, original }) => {
+    highlighted = highlighted.replace(
+      marker,
+      `<mark class="search-highlight">${original}</mark>`
+    );
+  });
+
+  return highlighted;
 };
 
 /**
- * Extract preview snippet with context around match
+ * Extract a preview snippet around the first match
  */
-export const getMatchPreview = (text, query, contextLength = 50) => {
-  if (!text || !query) return text.substring(0, 150) + (text.length > 150 ? '...' : '');
-  
-  const normalizedText = normalizeQuery(text);
-  const q = normalizeQuery(query);
-  const terms = q.split(/\s+/).filter(term => term.length > 0 && !STOP_WORDS.has(term));
-  
-  // Find the first term that appears in the text
-  let matchIndex = -1;
-  for (const term of terms) {
-    matchIndex = normalizedText.indexOf(term);
-    if (matchIndex !== -1) break;
+export const getMatchPreview = (text, query, contextLength = 60) => {
+  if (!text || !query) {
+    return text.length > 150 ? text.substring(0, 150) + '...' : text;
   }
+
+  const words = normalizeQuery(query).split(' ').filter(w => w.length > 0);
+  const normalizedText = text.toLowerCase();
   
-  if (matchIndex === -1) {
-    return text.substring(0, 150) + (text.length > 150 ? '...' : '');
+  // Find index of first matching word
+  let firstMatchIndex = -1;
+  for (const word of words) {
+    const idx = normalizedText.indexOf(word);
+    if (idx !== -1 && (firstMatchIndex === -1 || idx < firstMatchIndex)) {
+      firstMatchIndex = idx;
+    }
   }
+
+  if (firstMatchIndex === -1) {
+    return text.length > 150 ? text.substring(0, 150) + '...' : text;
+  }
+
+  const start = Math.max(0, firstMatchIndex - contextLength);
+  const end = Math.min(text.length, firstMatchIndex + contextLength + 40);
   
-  const start = Math.max(0, matchIndex - contextLength);
-  const end = Math.min(text.length, matchIndex + contextLength + (terms[0]?.length || 0));
+  let snippet = text.substring(start, end);
+  if (start > 0) snippet = '...' + snippet;
+  if (end < text.length) snippet = snippet + '...';
   
-  let preview = text.substring(start, end);
-  if (start > 0) preview = '...' + preview;
-  if (end < text.length) preview = preview + '...';
-  
-  return preview;
+  return snippet;
 };
+
 

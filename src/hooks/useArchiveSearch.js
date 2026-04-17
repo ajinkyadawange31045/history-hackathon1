@@ -5,12 +5,13 @@ import { applyFilters, getDefaultFilters } from '../utils/filterLogic';
 /**
  * Hook for managing archival search state
  * Combines search query + filters
+ * Works with simplified multi-word search algorithm
  */
 export const useArchiveSearch = (documents, metadata) => {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(getDefaultFilters());
   const [sortBy, setSortBy] = useState('relevance'); // 'relevance', 'date-newest', 'date-oldest', 'title'
-  const [searchField, setSearchField] = useState('all'); // 'all', 'title', 'description'
+  const [searchField, setSearchField] = useState('all'); // 'all' (searches all fields)
   const [viewMode, setViewMode] = useState('grid'); // 'grid', 'list'
   const [debouncedQuery, setDebouncedQuery] = useState('');
   
@@ -37,15 +38,15 @@ export const useArchiveSearch = (documents, metadata) => {
     
     // Step 3: Sort
     const sorted = [...filtered];
+    
     if (sortBy === 'date-newest') {
       sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
     } else if (sortBy === 'date-oldest') {
       sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
     } else if (sortBy === 'title') {
+      // Sort alphabetically by title
       sorted.sort((a, b) => a.title.localeCompare(b.title));
     }
-    // 'relevance' sort already applied by searchDocuments (if query exists)
-    // if no query and relevance is selected, default to original order or newest
     
     return sorted;
   }, [debouncedQuery, filters, sortBy, searchField, documents]);
@@ -92,6 +93,7 @@ export const useArchiveSearch = (documents, metadata) => {
     setSortBy('relevance');
     setSearchField('all');
   }, []);
+  
   
   return {
     query,

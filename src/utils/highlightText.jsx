@@ -1,161 +1,111 @@
 /**
  * HIGHLIGHT TEXT UTILITY
- * Highlights search terms in text, similar to Google search results
+ * Highlights search terms in text with precision
  */
 
 /**
  * Escape HTML special characters to prevent XSS
  */
 const escapeHtml = (text) => {
+  if (!text) return '';
   const div = document.createElement('div');
-  div.textContent = text;
+  div.textContent = String(text);
   return div.innerHTML;
 };
 
 /**
- * Highlights search terms in text with yellow background
+ * Highlights multiple search terms in text using a two-pass replacement
+ * This approach prevents "highlighting the highlight tags" and double-highlighting
+ * 
  * @param {string} text - The text to highlight
- * @param {string} searchTerm - The search term to highlight
+ * @param {string} query - Search query (can contain multiple words)
  * @param {object} options - Configuration options
  * @returns {string} - HTML string with highlighted terms
  */
-export const highlightText = (text, searchTerm, options = {}) => {
-  if (!text || !searchTerm || typeof text !== 'string') {
+export const highlightText = (text, query, options = {}) => {
+  if (!text || !query || typeof text !== 'string') {
     return escapeHtml(text || '');
   }
 
   const {
     className = 'search-highlight',
-    caseSensitive = false,
-    wholeWord = false,
-    maxHighlights = 50 // Prevent performance issues with very long texts
+    maxHighlights = 100
   } = options;
 
-  // Escape the text first to prevent XSS
-  const escapedText = escapeHtml(text);
-  
-  // Handle multiple search terms by splitting on spaces
-  const searchTerms = searchTerm.trim().split(/\s+/).filter(term => term.length > 0);
-  
-  let highlightedText = escapedText;
-  
-  // Apply highlighting for each search term
-  searchTerms.forEach(term => {
-    if (!term) return;
-    
-    // Create regex pattern for highlighting
-    let pattern;
+  // 1. Escape the input text for safety
+  let escapedText = escapeHtml(text);
+
+  // 2. Extract and sort search terms (longest first)
+  const terms = query.trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(t => t.length > 0)
+    .sort((a, b) => b.length - a.length);
+
+  if (terms.length === 0) return escapedText;
+
+  // 3. First Pass: Replace matches with unique placeholders
+  // We use a specific pattern: __HL_[termIndex]_[matchIndex]__
+  const placeholders = [];
+  let placeholderCount = 0;
+
+  terms.forEach((term, termIndex) => {
     try {
-      // Escape special regex characters in the search term
+      // Escape for regex
       const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedTerm})`, 'gi');
       
-      // Build the pattern
-      let patternString = escapedTerm;
-      if (wholeWord) {
-        patternString = `\\b${patternString}\\b`;
-      }
-      
-      pattern = new RegExp(patternString, caseSensitive ? 'g' : 'gi');
-    } catch (error) {
-      // If regex fails, skip this term
-      return;
+      // Replace matches that aren't already part of a placeholder
+      // We look for parts of the string that don't match our placeholder pattern
+      escapedText = escapedText.replace(regex, (match) => {
+        if (placeholderCount >= maxHighlights) return match;
+        
+        const id = `__HL_${termIndex}_${placeholderCount}__`;
+        placeholders.push({ id, original: match });
+        placeholderCount++;
+        return id;
+      });
+    } catch (e) {
+      console.error('Highlight regex error:', e);
     }
-
-    // Split text and highlight matches
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-    let highlightCount = 0;
-
-    while ((match = pattern.exec(highlightedText)) !== null && highlightCount < maxHighlights) {
-      // Add text before the match
-      if (match.index > lastIndex) {
-        parts.push(highlightedText.substring(lastIndex, match.index));
-      }
-      
-      // Add highlighted match
-      parts.push(`<mark class="${className}">${match[0]}</mark>`);
-      
-      lastIndex = pattern.lastIndex;
-      highlightCount++;
-    }
-
-    // Add remaining text
-    if (lastIndex < highlightedText.length) {
-      parts.push(highlightedText.substring(lastIndex));
-    }
-
-    highlightedText = parts.length > 1 ? parts.join('') : highlightedText;
   });
 
-  return highlightedText;
+  // 4. Second Pass: Replace placeholders with final HTML
+  let finalHtml = escapedText;
+  placeholders.forEach(({ id, original }) => {
+    finalHtml = finalHtml.replace(id, `<mark class="${className}">${original}</mark>`);
+  });
+
+  return finalHtml;
 };
 
 /**
- * Highlights multiple search terms in text
- * @param {string} text - The text to highlight
- * @param {string[]} searchTerms - Array of search terms to highlight
- * @param {object} options - Configuration options
- * @returns {string} - HTML string with highlighted terms
+ * Legacy compatibility for multiple terms
  */
 export const highlightMultipleTerms = (text, searchTerms, options = {}) => {
-  if (!text || !searchTerms?.length || typeof text !== 'string') {
-    return escapeHtml(text || '');
-  }
-
-  let highlightedText = escapeHtml(text);
-  
-  // Apply highlighting for each term
-  searchTerms.forEach(term => {
-    if (term && term.trim()) {
-      highlightedText = highlightText(highlightedText, term.trim(), {
-        ...options,
-        // Prevent double-highlighting by using a different approach
-        className: options.className || 'search-highlight'
-      });
-    }
-  });
-
-  return highlightedText;
+  const query = Array.isArray(searchTerms) ? searchTerms.join(' ') : searchTerms;
+  return highlightText(text, query, options);
 };
 
 /**
  * Extracts search terms from a query string
- * @param {string} query - Search query
- * @returns {string[]} - Array of unique search terms
  */
 export const extractSearchTerms = (query) => {
-  if (!query || typeof query !== 'string') {
-    return [];
-  }
-
-  // Split by spaces and quotes, remove empty strings and duplicates
-  const terms = query
-    .match(/"[^"]+"|\S+/g) || [] // Match quoted phrases and individual words
-    .map(term => term.replace(/"/g, '').trim())
-    .filter(term => term.length > 0)
-    .filter((term, index, arr) => arr.indexOf(term) === index); // Remove duplicates
-
-  return terms;
+  if (!query || typeof query !== 'string') return [];
+  return query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
 };
 
 /**
  * React component for rendering highlighted text
  */
 export const HighlightedText = ({ text, searchTerm, options = {} }) => {
-  if (!text || !searchTerm) {
-    return <span>{text || ''}</span>;
-  }
+  if (!text) return null;
+  if (!searchTerm) return <span>{text}</span>;
 
-  const highlightedHTML = highlightText(text, searchTerm, options);
-  
   return (
     <span 
-      dangerouslySetInnerHTML={{ __html: highlightedHTML }}
-      style={{ 
-        wordBreak: 'break-word',
-        ...options.style
-      }}
+      dangerouslySetInnerHTML={{ __html: highlightText(text, searchTerm, options) }}
+      className="highlight-wrapper"
     />
   );
 };
@@ -166,3 +116,4 @@ export default {
   extractSearchTerms,
   HighlightedText
 };
+

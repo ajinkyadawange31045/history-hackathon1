@@ -6,6 +6,16 @@ import { highlightText, extractSearchTerms } from '../utils/highlightText.jsx';
 import '../styles/highlight.css';
 
 /**
+ * Escape HTML special characters
+ */
+const escapeHtml = (text) => {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
+
+/**
  * DOCUMENT CARD - REFINED HISTORICAL DESIGN
  * Refined archival record with improved typography, spacing, and interactions
  * Features: serif/sans-serif hierarchy, soft shadows, accent borders, smooth transitions
@@ -33,32 +43,41 @@ export const DocumentCard = ({ document, searchQuery, searchField = 'all' }) => 
 
     return highlightText(text, searchQuery, {
       className: 'search-highlight highlight-animation',
-      maxHighlights: 10
+      maxHighlights: 20
     });
   };
 
-  // Determine why this document matched if not in title
+  // Determine why this document matched if not in title or desc
   const getMatchContext = () => {
     if (!searchQuery || searchField !== 'all') return null;
     
-    const q = searchQuery.toLowerCase();
-    const normalizedTitle = document.title?.toLowerCase() || '';
-    if (normalizedTitle.includes(q)) return null; 
+    const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    const visibleFields = (document.title + ' ' + document.description).toLowerCase();
+    
+    // Find terms that are NOT in title or description but ARE in other fields
+    const missingTerms = terms.filter(term => !visibleFields.includes(term));
+    
+    if (missingTerms.length === 0) return null;
 
-    if (document.place?.toLowerCase().includes(q) || document.region?.toLowerCase().includes(q)) {
-      return `Matched in location: ${document.place}`;
+    const matches = [];
+    missingTerms.forEach(term => {
+      if (document.place?.toLowerCase().includes(term)) matches.push(`Location: ${document.place}`);
+      else if (document.author?.toLowerCase().includes(term)) matches.push(`Author: ${document.author}`);
+      else if (document.collection?.toLowerCase().includes(term)) matches.push(`Collection: ${document.collection}`);
+      else if (document.holdingInstitution?.toLowerCase().includes(term)) matches.push(`Institution: ${document.holdingInstitution}`);
+      else if (document.subjects?.some(s => s.toLowerCase().includes(term))) matches.push(`Subjects: ${document.subjects.join(', ')}`);
+      else if (document.keywords?.some(k => k.toLowerCase().includes(term))) matches.push(`Keywords: ${document.keywords.join(', ')}`);
+    });
+
+    if (matches.length > 0) {
+      // Remove duplicates and join
+      const uniqueMatches = [...new Set(matches)];
+      return `Also matched in ${uniqueMatches.slice(0, 2).join(' & ')}${uniqueMatches.length > 2 ? '...' : ''}`;
     }
-    if (document.author?.toLowerCase().includes(q)) {
-      return `Matched in author: ${document.author}`;
-    }
-    if (document.subjects?.some(s => s.toLowerCase().includes(q))) {
-      return `Matched in subjects`;
-    }
-    if (document.description?.toLowerCase().includes(q)) {
-      return `Matched in description`;
-    }
+    
     return null;
   };
+
 
   const matchContext = getMatchContext();
   
@@ -163,18 +182,20 @@ export const DocumentCard = ({ document, searchQuery, searchField = 'all' }) => 
           dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.description, 'description') }}
         />
         
-        {/* METADATA SECTION */}
+        {/* METADATA SECTION - Only highlight if searching in 'all' fields */}
         <div className="mt-auto pt-3 space-y-2 text-xs">
           {/* Location */}
           <div className="flex items-center gap-2">
             <svg className="w-3 h-3 opacity-60" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
             </svg>
-            <span 
-              className="truncate" 
-              style={{ color: archiveColors.darkBrown }}
-              dangerouslySetInnerHTML={{ __html: highlightIfSearched(`${document.place}`, 'all') }}
-            />
+            <span className="truncate" style={{ color: archiveColors.darkBrown }}>
+              {searchField === 'all' && searchQuery ? (
+                <span dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.place, 'place') }} />
+              ) : (
+                <>{document.place}</>
+              )}
+            </span>
           </div>
           
           {/* Author */}
@@ -183,11 +204,13 @@ export const DocumentCard = ({ document, searchQuery, searchField = 'all' }) => 
               <svg className="w-3 h-3 opacity-60" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
-              <span 
-                className="truncate" 
-                style={{ color: archiveColors.darkBrown }}
-                dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.author, 'all') }}
-              />
+              <span className="truncate" style={{ color: archiveColors.darkBrown }}>
+                {searchField === 'all' && searchQuery ? (
+                  <span dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.author, 'author') }} />
+                ) : (
+                  <>{document.author}</>
+                )}
+              </span>
             </div>
           )}
         </div>
@@ -230,13 +253,23 @@ export const DocumentListRow = ({ document, searchQuery, searchField = 'all' }) 
 
   const getMatchContext = () => {
     if (!searchQuery || searchField !== 'all') return null;
-    const q = searchQuery.toLowerCase();
-    if (document.title?.toLowerCase().includes(q)) return null;
-    if (document.place?.toLowerCase().includes(q)) return `In Location: ${document.place}`;
-    if (document.author?.toLowerCase().includes(q)) return `In Author: ${document.author}`;
-    if (document.description?.toLowerCase().includes(q)) return `In Description`;
+    const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    const visibleFields = (document.title + ' ' + document.description).toLowerCase();
+    const missingTerms = terms.filter(term => !visibleFields.includes(term));
+    if (missingTerms.length === 0) return null;
+
+    const matches = [];
+    missingTerms.forEach(term => {
+      if (document.place?.toLowerCase().includes(term)) matches.push(`Location`);
+      else if (document.author?.toLowerCase().includes(term)) matches.push(`Author`);
+      else if (document.collection?.toLowerCase().includes(term)) matches.push(`Collection`);
+      else if (document.subjects?.some(s => s.toLowerCase().includes(term))) matches.push(`Subjects`);
+    });
+
+    if (matches.length > 0) return `Matched in ${[...new Set(matches)].join(', ')}`;
     return null;
   };
+
 
   const matchContext = getMatchContext();
   
@@ -294,7 +327,13 @@ export const DocumentListRow = ({ document, searchQuery, searchField = 'all' }) 
           <div className="flex items-center gap-4">
             <span className="text-[10px] opacity-60 flex items-center gap-1" style={{ color: archiveColors.darkBrown }}>
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
-              <span dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.place, 'all') }} />
+              <span>
+                {searchField === 'all' && searchQuery ? (
+                  <span dangerouslySetInnerHTML={{ __html: highlightIfSearched(document.place, 'place') }} />
+                ) : (
+                  <>{document.place}</>
+                )}
+              </span>
             </span>
           </div>
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: archiveColors.rust }}>

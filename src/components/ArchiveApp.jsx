@@ -280,6 +280,7 @@ export const ArchiveApp = ({ data }) => {
             totalResults={totalResults}
             isLoading={false}
             searchQuery={query}
+            searchField={searchField}
             viewMode={viewMode}
           />
 
